@@ -63,12 +63,14 @@ public class UpdateGroupRequestProcessor {
                     .getPassedStream()
                     .leftJoin(groupAggregateStore,
                             (leftKey, leftValue) -> leftKey,
-                            UpdateRequestAndExistingGroup::new);
+                            RequestAndExistingGroup::new);
 
             var etagValidation = validateEtag(updateGroupRequestAndCurrentGroup);
 
-            var updatedFieldMask = etagValidation.getPassedStream()
-                    .mapValues(value -> new UpdateRequestAndExistingGroup(
+            var softDeleteValidation = validateSoftDelete(etagValidation.getPassedStream());
+
+            var updatedFieldMask = softDeleteValidation.getPassedStream()
+                    .mapValues(value -> new RequestAndExistingGroup<>(
                             value.getRequest().toBuilder().setUpdateMask(removeImmutableField(value.getRequest().getUpdateMask())).build(),
                             value.getCurrentGroup()));
 
@@ -97,6 +99,7 @@ public class UpdateGroupRequestProcessor {
             return ownerValidation.getStatusStream()
                     .merge(groupExistsValidation.getStatusStream())
                     .merge(etagValidation.getStatusStream())
+                    .merge(softDeleteValidation.getStatusStream())
                     .merge(fieldMaskValidation.getStatusStream())
                     .merge(simpleValidation.getStatusStream())
                     .merge(successStatus);
@@ -127,15 +130,16 @@ public class UpdateGroupRequestProcessor {
         return new StreamValidationResult<>(passed, failed, status);
     }
 
-    private StreamValidationResult<String, UpdateGroupRequest> validateGroupExists(KStream<String, UpdateGroupRequest> input, GlobalKTable<String, Group> groupAggregateStore) {
+
+    private static StreamValidationResult<String, UpdateGroupRequest> validateGroupExists(KStream<String, UpdateGroupRequest> input, GlobalKTable<String, Group> groupAggregateStore) {
         var validation = input
                 .leftJoin(groupAggregateStore,
                         (leftKey, leftValue) -> leftKey,
-                        UpdateRequestAndExistingGroup::new);
+                        RequestAndExistingGroup::new);
 
         var failed = validation
                 .filterNot((key, value) -> value.currentGroupExists())
-                .mapValues(UpdateRequestAndExistingGroup::getRequest);
+                .mapValues(RequestAndExistingGroup::getRequest);
 
         var status = failed
                 .mapValues(value -> Status.newBuilder()
@@ -145,12 +149,12 @@ public class UpdateGroupRequestProcessor {
 
         var passed = validation
                 .filter(((key, value) -> value.currentGroupExists()))
-                .mapValues(UpdateRequestAndExistingGroup::getRequest);
+                .mapValues(RequestAndExistingGroup::getRequest);
 
         return new StreamValidationResult<>(passed, failed, status);
     }
 
-    private StreamValidationResult<String, UpdateRequestAndExistingGroup> validateEtag(KStream<String, UpdateRequestAndExistingGroup> input) {
+    private StreamValidationResult<String, RequestAndExistingGroup<UpdateGroupRequest>> validateEtag(KStream<String, RequestAndExistingGroup<UpdateGroupRequest>> input) {
         var validation = input
                 .mapValues(value -> new ValidationResult<>(value).setPass(value.getRequest().getGroup().getEtag().equals(value.getCurrentGroup().getEtag())));
 
@@ -176,6 +180,32 @@ public class UpdateGroupRequestProcessor {
         return new StreamValidationResult<>(passed, failed, status);
     }
 
+    private StreamValidationResult<String, RequestAndExistingGroup<UpdateGroupRequest>> validateSoftDelete(KStream<String, RequestAndExistingGroup<UpdateGroupRequest>> input) {
+        var validation = input
+                .mapValues(value -> new ValidationResult<>(value).setFail(value.getCurrentGroup().getState() == Group.State.DELETED));
+
+        var failed = validation
+                .filter((key, value) -> value.isFailed())
+                .mapValues(ValidationResult::getItem);
+
+        var status = failed
+                .mapValues(value -> Status.newBuilder()
+                        .setCode(Code.FAILED_PRECONDITION_VALUE)
+                        .setMessage("Group is in DELETED state.")
+                        .addDetails(Any.pack(ErrorInfo.newBuilder()
+                                .setReason("Group is soft deleted.")
+                                .setDomain("groupservice.groupwallet.chaiweijian.com")
+                                .putMetadata("name", value.getRequest().getGroup().getName())
+                                .build()))
+                        .build());
+
+        var passed = validation
+                .filterNot((key, value) -> value.isFailed())
+                .mapValues(ValidationResult::getItem);
+
+        return new StreamValidationResult<>(passed, failed, status);
+    }
+
     private static FieldMask removeImmutableField(FieldMask fieldMask) {
         final FieldMask OUTPUT_ONLY = FieldMask.newBuilder()
                 .addPaths("name")
@@ -190,7 +220,7 @@ public class UpdateGroupRequestProcessor {
         return FieldMaskUtil.subtract(fieldMask, OUTPUT_ONLY);
     }
 
-    private StreamValidationResult<String, UpdateRequestAndExistingGroup> validateFieldMask(KStream<String, UpdateRequestAndExistingGroup> input) {
+    private StreamValidationResult<String, RequestAndExistingGroup<UpdateGroupRequest>> validateFieldMask(KStream<String, RequestAndExistingGroup<UpdateGroupRequest>> input) {
 
         var validation = input
                 .mapValues(value -> new ValidationResult<>(value).setPass(FieldMaskUtil.isValid(Group.class, value.getRequest().getUpdateMask())));
@@ -219,15 +249,5 @@ public class UpdateGroupRequestProcessor {
     private static class UpdateGroupRequestAndOwner {
         private final UpdateGroupRequest request;
         private final User owner;
-    }
-
-    @Data
-    private static class UpdateRequestAndExistingGroup {
-        private final UpdateGroupRequest request;
-        private final Group currentGroup;
-
-        public boolean currentGroupExists() {
-            return currentGroup != null;
-        }
     }
 }

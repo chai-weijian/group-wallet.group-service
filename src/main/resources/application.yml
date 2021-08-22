@@ -15,10 +15,26 @@ spring.cloud.stream.bindings:
     destination: groupwallet.groupservice.GroupAggregate-stream
   updateGroup-out-0:
     destination: groupwallet.groupservice.UpdateGroup-responses
+  deleteGroup-in-0:
+    destination: groupwallet.groupservice.DeleteGroup-requests
+  deleteGroup-in-1:
+    destination: groupwallet.groupservice.GroupAggregate-stream
+  deleteGroup-out-0:
+    destination: groupwallet.groupservice.DeleteGroup-responses
+  undeleteGroup-in-0:
+    destination: groupwallet.groupservice.UndeleteGroup-requests
+  undeleteGroup-in-1:
+    destination: groupwallet.groupservice.GroupAggregate-stream
+  undeleteGroup-out-0:
+    destination: groupwallet.groupservice.UndeleteGroup-responses
   aggregateGroup-in-0:
     destination: groupwallet.groupservice.GroupCreated-events
   aggregateGroup-in-1:
     destination: groupwallet.groupservice.GroupUpdated-events
+  aggregateGroup-in-2:
+    destination: groupwallet.groupservice.GroupDeleted-events
+  aggregateGroup-in-3:
+    destination: groupwallet.groupservice.GroupUndeleted-events
   aggregateGroup-out-0:
     destination: groupwallet.groupservice.GroupAggregate-stream
 
@@ -27,6 +43,10 @@ spring.cloud.stream.kafka.streams.binder.functions:
     application-id: groupwallet.groupservice.createGroup-app
   updateGroup:
     application-id: groupwallet.groupservice.updateGroup-app
+  deleteGroup:
+    application-id: groupwallet.groupservice.deleteGroup-app
+  undeleteGroup:
+    application-id: groupwallet.groupservice.undeleteGroup-app
   aggregateGroup:
     application-id: groupwallet.groupservice.aggregateGroup-app
 
@@ -38,7 +58,7 @@ spring.cloud.stream.kafka.streams.binder:
 spring:
   cloud:
     function:
-      definition: createGroup;updateGroup;aggregateGroup
+      definition: createGroup;updateGroup;aggregateGroup;deleteGroup;undeleteGroup
   kafka:
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer

@@ -14,8 +14,8 @@
 
 package com.chaiweijian.groupwallet.groupservice.util;
 
-import org.apache.kafka.streams.kstream.KStream;
 import com.chaiweijian.groupwallet.groupservice.v1.Group;
+import org.apache.kafka.streams.kstream.KStream;
 
 public class GroupStreamValidatorUtil {
     public static StreamValidationResult<String, Group> validateSimple(KStream<String, Group> input) {
@@ -36,4 +36,5 @@ public class GroupStreamValidatorUtil {
 
         return new StreamValidationResult<>(passed, failed, status);
     }
+
 }

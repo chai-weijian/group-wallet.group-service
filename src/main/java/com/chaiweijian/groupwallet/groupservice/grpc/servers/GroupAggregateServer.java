@@ -17,6 +17,9 @@ package com.chaiweijian.groupwallet.groupservice.grpc.servers;
 import com.chaiweijian.groupwallet.groupservice.v1.CreateGroupRequest;
 import com.chaiweijian.groupwallet.groupservice.v1.GetGroupRequest;
 import com.chaiweijian.groupwallet.groupservice.v1.Group;
+import com.chaiweijian.groupwallet.groupservice.v1.UpdateGroupRequest;
+import com.chaiweijian.groupwallet.groupservice.v1.DeleteGroupRequest;
+import com.chaiweijian.groupwallet.groupservice.v1.UndeleteGroupRequest;
 import com.chaiweijian.groupwallet.groupservice.v1.GroupAggregateServiceGrpc;
 import com.google.protobuf.Any;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -34,7 +37,6 @@ import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
 import org.springframework.cloud.stream.binder.kafka.streams.InteractiveQueryService;
 import org.springframework.kafka.requestreply.ReplyingKafkaTemplate;
 import org.springframework.kafka.requestreply.RequestReplyFuture;
-import com.chaiweijian.groupwallet.groupservice.v1.UpdateGroupRequest;
 
 import java.util.concurrent.TimeUnit;
 
@@ -42,13 +44,19 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 public class GroupAggregateServer extends GroupAggregateServiceGrpc.GroupAggregateServiceImplBase {
 
+    private final ReplyingKafkaTemplate<String, UndeleteGroupRequest, Status> undeleteGroupTemplate;
+    private final ReplyingKafkaTemplate<String, DeleteGroupRequest, Status> deleteGroupTemplate;
     private final ReplyingKafkaTemplate<String, UpdateGroupRequest, Status> updateGroupTemplate;
     private final ReplyingKafkaTemplate<String, CreateGroupRequest, Status> createGroupTemplate;
     private final InteractiveQueryService interactiveQueryService;
 
-    public GroupAggregateServer(ReplyingKafkaTemplate<String, UpdateGroupRequest, Status> updateGroupTemplate,
+    public GroupAggregateServer(ReplyingKafkaTemplate<String, UndeleteGroupRequest, Status> undeleteGroupTemplate,
+                                ReplyingKafkaTemplate<String, DeleteGroupRequest, Status> deleteGroupTemplate,
+                                ReplyingKafkaTemplate<String, UpdateGroupRequest, Status> updateGroupTemplate,
                                 ReplyingKafkaTemplate<String, CreateGroupRequest, Status> createGroupTemplate,
                                 InteractiveQueryService interactiveQueryService) {
+        this.undeleteGroupTemplate = undeleteGroupTemplate;
+        this.deleteGroupTemplate = deleteGroupTemplate;
         this.updateGroupTemplate = updateGroupTemplate;
         this.createGroupTemplate = createGroupTemplate;
         this.interactiveQueryService = interactiveQueryService;
@@ -83,7 +91,7 @@ public class GroupAggregateServer extends GroupAggregateServiceGrpc.GroupAggrega
         RequestReplyFuture<String, CreateGroupRequest, Status> replyFuture = createGroupTemplate.sendAndReceive(record);
         try {
             ConsumerRecord<String, Status> consumerRecord = replyFuture.get(10, TimeUnit.SECONDS);
-            handleCreateUpdateResponse(consumerRecord, responseObserver);
+            handleResponse(consumerRecord, responseObserver);
         } catch (Exception exception) {
             log.error("GroupAggregateServer - createGroup Error", exception);
             responseObserver.onError(new StatusException(io.grpc.Status.INTERNAL.withCause(exception)));
@@ -100,15 +108,49 @@ public class GroupAggregateServer extends GroupAggregateServiceGrpc.GroupAggrega
         RequestReplyFuture<String, UpdateGroupRequest, Status> replyFuture = updateGroupTemplate.sendAndReceive(record);
         try {
             ConsumerRecord<String, Status> consumerRecord = replyFuture.get(10, TimeUnit.SECONDS);
-            handleCreateUpdateResponse(consumerRecord, responseObserver);
+            handleResponse(consumerRecord, responseObserver);
         } catch (Exception exception) {
             log.error("GroupAggregateServer - updateGroup Error", exception);
             responseObserver.onError(new StatusException(io.grpc.Status.INTERNAL.withCause(exception)));
         }
     }
 
-    private void handleCreateUpdateResponse(ConsumerRecord<String, Status> consumerRecord,
-                                            StreamObserver<Group> responseObserver) throws InvalidProtocolBufferException {
+    @Override
+    public void deleteGroup(DeleteGroupRequest request, StreamObserver<Group> responseObserver) {
+        ProducerRecord<String, DeleteGroupRequest> record = new ProducerRecord<>(
+                "groupwallet.groupservice.DeleteGroup-requests",
+                request.getName(),
+                request);
+
+        RequestReplyFuture<String, DeleteGroupRequest, Status> replyFuture = deleteGroupTemplate.sendAndReceive(record);
+        try {
+            ConsumerRecord<String, Status> consumerRecord = replyFuture.get(10, TimeUnit.SECONDS);
+            handleResponse(consumerRecord, responseObserver);
+        } catch (Exception exception) {
+            log.error("GroupAggregateServer - deleteGroup Error", exception);
+            responseObserver.onError(new StatusException(io.grpc.Status.INTERNAL.withCause(exception)));
+        }
+    }
+
+    @Override
+    public void undeleteGroup(UndeleteGroupRequest request, StreamObserver<Group> responseObserver) {
+        ProducerRecord<String, UndeleteGroupRequest> record = new ProducerRecord<>(
+                "groupwallet.groupservice.UndeleteGroup-requests",
+                request.getName(),
+                request);
+
+        RequestReplyFuture<String, UndeleteGroupRequest, Status> replyFuture = undeleteGroupTemplate.sendAndReceive(record);
+        try {
+            ConsumerRecord<String, Status> consumerRecord = replyFuture.get(10, TimeUnit.SECONDS);
+            handleResponse(consumerRecord, responseObserver);
+        } catch (Exception exception) {
+            log.error("GroupAggregateServer - undeleteGroup Error", exception);
+            responseObserver.onError(new StatusException(io.grpc.Status.INTERNAL.withCause(exception)));
+        }
+    }
+
+    private void handleResponse(ConsumerRecord<String, Status> consumerRecord,
+                                StreamObserver<Group> responseObserver) throws InvalidProtocolBufferException {
         if (consumerRecord.value().getCode() == Code.OK_VALUE) {
             // if the response is not error, the first detail will be the group created/updated.
             Any detail = consumerRecord.value().getDetails(0);

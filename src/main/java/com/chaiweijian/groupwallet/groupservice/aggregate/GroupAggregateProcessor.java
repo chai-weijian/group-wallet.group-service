@@ -37,14 +37,18 @@ public class GroupAggregateProcessor {
     }
 
     @Bean
-    public Function<KStream<String, Group>, Function<KStream<String, Group>, KStream<String, Group>>> aggregateGroup() {
-        return groupCreated -> groupUpdated -> {
+    public Function<KStream<String, Group>, Function<KStream<String, Group>, Function<KStream<String, Group>, Function<KStream<String, Group>, KStream<String, Group>>>>> aggregateGroup() {
+        return groupCreated -> groupUpdated -> groupDeleted -> groupUndeleted -> {
             var groupCreatedEvent = groupCreated.groupByKey();
             var groupUpdatedEvent = groupUpdated.groupByKey();
+            var groupDeletedEvent = groupDeleted.groupByKey();
+            var groupUndeletedEvent = groupUndeleted.groupByKey();
 
             return groupCreatedEvent
                     .cogroup(EventHandler::handleGroupCreatedEvent)
                     .cogroup(groupUpdatedEvent, EventHandler::handleGroupUpdatedEvent)
+                    .cogroup(groupDeletedEvent, EventHandler::handleGroupDeletedEvent)
+                    .cogroup(groupUndeletedEvent, EventHandler::handleGroupUndeletedEvent)
                     .aggregate(() -> null,
                             Materialized.<String, Group, KeyValueStore<Bytes, byte[]>>as("groupwallet.groupservice.GroupAggregate-store")
                                     .withKeySerde(Serdes.String())
@@ -54,7 +58,6 @@ public class GroupAggregateProcessor {
     }
 
     private static class EventHandler {
-        // Simply update aggregate version and return the new group
         public static Group handleGroupCreatedEvent(String key, Group group, Group init) {
             var aggregateVersion = 1;
             return group.toBuilder()
@@ -63,8 +66,23 @@ public class GroupAggregateProcessor {
                     .build();
         }
 
-        // UserUpdated event provide a full group object, simply increment aggregate version and return it
         public static Group handleGroupUpdatedEvent(String key, Group group, Group init) {
+            var aggregateVersion = init.getAggregateVersion() + 1;
+            return group.toBuilder()
+                    .setAggregateVersion(aggregateVersion)
+                    .setEtag(GroupAggregateUtil.calculateEtag(aggregateVersion))
+                    .build();
+        }
+
+        public static Group handleGroupDeletedEvent(String key, Group group, Group init) {
+            var aggregateVersion = init.getAggregateVersion() + 1;
+            return group.toBuilder()
+                    .setAggregateVersion(aggregateVersion)
+                    .setEtag(GroupAggregateUtil.calculateEtag(aggregateVersion))
+                    .build();
+        }
+
+        public static Group handleGroupUndeletedEvent(String key, Group group, Group init) {
             var aggregateVersion = init.getAggregateVersion() + 1;
             return group.toBuilder()
                     .setAggregateVersion(aggregateVersion)
