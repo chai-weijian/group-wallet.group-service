@@ -1,0 +1,52 @@
+
+
+spring.cloud.stream.bindings:
+  createGroup-in-0:
+    destination: groupwallet.groupservice.CreateGroup-requests
+  createGroup-in-1:
+    destination: groupwallet.userservice.UserAggregate-stream
+  createGroup-out-0:
+    destination: groupwallet.groupservice.CreateGroup-responses
+  updateGroup-in-0:
+    destination: groupwallet.groupservice.UpdateGroup-requests
+  updateGroup-in-1:
+    destination: groupwallet.userservice.UserAggregate-stream
+  updateGroup-in-2:
+    destination: groupwallet.groupservice.GroupAggregate-stream
+  updateGroup-out-0:
+    destination: groupwallet.groupservice.UpdateGroup-responses
+  aggregateGroup-in-0:
+    destination: groupwallet.groupservice.GroupCreated-events
+  aggregateGroup-in-1:
+    destination: groupwallet.groupservice.GroupUpdated-events
+  aggregateGroup-out-0:
+    destination: groupwallet.groupservice.GroupAggregate-stream
+
+spring.cloud.stream.kafka.streams.binder.functions:
+  createGroup:
+    application-id: groupwallet.groupservice.createGroup-app
+  updateGroup:
+    application-id: groupwallet.groupservice.updateGroup-app
+  aggregateGroup:
+    application-id: groupwallet.groupservice.aggregateGroup-app
+
+spring.cloud.stream.kafka.streams.binder:
+  configuration:
+    schema.registry.url: http://localhost:8081
+    commit.interval.ms: 0
+
+spring:
+  cloud:
+    function:
+      definition: createGroup;updateGroup;aggregateGroup
+  kafka:
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: io.confluent.kafka.serializers.protobuf.KafkaProtobufSerializer
+    consumer:
+      value-deserializer: io.confluent.kafka.serializers.protobuf.KafkaProtobufDeserializer
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    properties:
+      schema.registry.url: http://localhost:8081
+
+grpc.server.port: 8092

@@ -12,16 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package com.chaiweijian.groupwallet.groupservice;
+package com.chaiweijian.groupwallet.groupservice.util;
 
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
+import com.chaiweijian.groupwallet.groupservice.v1.Group;
 
-@SpringBootApplication
-public class GroupServiceApplication {
-
-    public static void main(String[] args) {
-        SpringApplication.run(GroupServiceApplication.class, args);
+public class SimpleGroupFormatter {
+    public static Group format(Group group) {
+        return group.toBuilder()
+                .setDisplayName(group.getDisplayName().trim())
+                .build();
     }
-
 }

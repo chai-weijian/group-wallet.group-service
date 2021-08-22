@@ -12,16 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package com.chaiweijian.groupwallet.groupservice;
+package com.chaiweijian.groupwallet.groupservice.interfaces;
 
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
+import com.google.rpc.BadRequest;
 
-@SpringBootApplication
-public class GroupServiceApplication {
-
-    public static void main(String[] args) {
-        SpringApplication.run(GroupServiceApplication.class, args);
-    }
-
+public interface SimpleValidator {
+    BadRequest getBadRequest();
 }

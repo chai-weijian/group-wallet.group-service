@@ -12,16 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package com.chaiweijian.groupwallet.groupservice;
+package com.chaiweijian.groupwallet.groupservice.util;
 
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
+import com.google.protobuf.Any;
+import com.google.protobuf.Message;
+import com.google.rpc.Code;
+import com.google.rpc.Status;
 
-@SpringBootApplication
-public class GroupServiceApplication {
-
-    public static void main(String[] args) {
-        SpringApplication.run(GroupServiceApplication.class, args);
+public class OkStatusUtil {
+    public static <T extends Message> Status packStatus(T t, String message) {
+        return Status.newBuilder().setCode(Code.OK_VALUE).setMessage(message).addDetails(Any.pack(t)).build();
     }
-
 }
