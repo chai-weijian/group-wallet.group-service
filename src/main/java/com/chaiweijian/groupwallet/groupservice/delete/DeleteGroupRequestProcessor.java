@@ -63,7 +63,7 @@ public class DeleteGroupRequestProcessor {
                             .setExpireTime(fromMillis(currentTimeMillis() + Duration.ofDays(30).toMillis()))
                             .setState(Group.State.DELETED)
                             .setAggregateVersion(value.getAggregateVersion() + 1)
-                            .setEtag(GroupAggregateUtil.calculateEtag(value.getAggregateVersion() + 1))
+                            .setEtag(GroupAggregateUtil.calculateEtag(value.getName(), value.getAggregateVersion() + 1))
                             .build());
 
             deletedGroup.to("groupwallet.groupservice.GroupDeleted-events", Produced.with(Serdes.String(), groupSerde));

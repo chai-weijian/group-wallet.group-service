@@ -89,7 +89,7 @@ public class UpdateGroupRequestProcessor {
                     .getPassedStream()
                     .mapValues(value -> value.toBuilder()
                             .setAggregateVersion(value.getAggregateVersion() + 1)
-                            .setEtag(GroupAggregateUtil.calculateEtag(value.getAggregateVersion() + 1))
+                            .setEtag(GroupAggregateUtil.calculateEtag(value.getName(), value.getAggregateVersion() + 1))
                             .build());
 
             updatedGroup.to("groupwallet.groupservice.GroupUpdated-events", Produced.with(Serdes.String(), groupSerde));

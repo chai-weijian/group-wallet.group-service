@@ -62,7 +62,7 @@ public class GroupAggregateProcessor {
             var aggregateVersion = 1;
             return group.toBuilder()
                     .setAggregateVersion(aggregateVersion)
-                    .setEtag(GroupAggregateUtil.calculateEtag(aggregateVersion))
+                    .setEtag(GroupAggregateUtil.calculateEtag(group.getName(), aggregateVersion))
                     .build();
         }
 
@@ -70,7 +70,7 @@ public class GroupAggregateProcessor {
             var aggregateVersion = init.getAggregateVersion() + 1;
             return group.toBuilder()
                     .setAggregateVersion(aggregateVersion)
-                    .setEtag(GroupAggregateUtil.calculateEtag(aggregateVersion))
+                    .setEtag(GroupAggregateUtil.calculateEtag(group.getName(), aggregateVersion))
                     .build();
         }
 
@@ -78,7 +78,7 @@ public class GroupAggregateProcessor {
             var aggregateVersion = init.getAggregateVersion() + 1;
             return group.toBuilder()
                     .setAggregateVersion(aggregateVersion)
-                    .setEtag(GroupAggregateUtil.calculateEtag(aggregateVersion))
+                    .setEtag(GroupAggregateUtil.calculateEtag(group.getName(), aggregateVersion))
                     .build();
         }
 
@@ -86,7 +86,7 @@ public class GroupAggregateProcessor {
             var aggregateVersion = init.getAggregateVersion() + 1;
             return group.toBuilder()
                     .setAggregateVersion(aggregateVersion)
-                    .setEtag(GroupAggregateUtil.calculateEtag(aggregateVersion))
+                    .setEtag(GroupAggregateUtil.calculateEtag(group.getName(), aggregateVersion))
                     .build();
         }
     }

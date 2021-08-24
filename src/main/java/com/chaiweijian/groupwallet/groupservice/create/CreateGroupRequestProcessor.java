@@ -68,7 +68,7 @@ public class CreateGroupRequestProcessor {
                             .setCreateTime(fromMillis(currentTimeMillis()))
                             .setState(Group.State.ACTIVE)
                             .setAggregateVersion(1)
-                            .setEtag(GroupAggregateUtil.calculateEtag(1))
+                            .setEtag(GroupAggregateUtil.calculateEtag(value.getName(), 1))
                             .build());
 
             newGroup

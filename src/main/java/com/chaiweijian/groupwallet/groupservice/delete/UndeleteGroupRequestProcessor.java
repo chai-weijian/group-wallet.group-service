@@ -59,7 +59,7 @@ public class UndeleteGroupRequestProcessor {
                             .clearExpireTime()
                             .setState(Group.State.ACTIVE)
                             .setAggregateVersion(value.getAggregateVersion() + 1)
-                            .setEtag(GroupAggregateUtil.calculateEtag(value.getAggregateVersion() + 1))
+                            .setEtag(GroupAggregateUtil.calculateEtag(value.getName(), value.getAggregateVersion() + 1))
                             .build());
 
             undeletedGroup.to("groupwallet.groupservice.GroupUndeleted-events", Produced.with(Serdes.String(), groupSerde));

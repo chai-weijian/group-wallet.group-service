@@ -19,13 +19,13 @@ import com.google.common.hash.Hashing;
 import java.nio.charset.StandardCharsets;
 
 public class GroupAggregateUtil {
-    public static String calculateEtag(Integer aggregateVersion) {
+    public static String calculateEtag(String name, Integer aggregateVersion) {
         // Fixed string to append to aggregate version before calculating etag.
         // This is to prevent client from guessing the next etag.
         final String etagSecret = "0d9d8250";
 
         //noinspection UnstableApiUsage
-        var calculated = Hashing.sha256().hashString(String.format("%s-%d", etagSecret, aggregateVersion), StandardCharsets.UTF_8).toString();
+        var calculated = Hashing.sha256().hashString(String.format("%s-%s-%d", etagSecret, name, aggregateVersion), StandardCharsets.UTF_8).toString();
 
         // ETag values should include quotes as described in [RFC 7232](https://datatracker.ietf.org/doc/html/rfc7232#section-2.3).
         // For example, a valid etag is "foo", not foo.
