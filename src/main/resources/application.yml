@@ -45,6 +45,8 @@ spring.cloud.stream.bindings:
     destination: groupwallet.userservice.GroupInvitationAccepted-events
   aggregateGroup-in-5:
     destination: groupwallet.groupservice.MemberRemoved-events
+  aggregateGroup-in-6:
+    destination: groupwallet.userservice.GroupRemoved-events
   aggregateGroup-out-0:
     destination: groupwallet.groupservice.GroupAggregate-stream
 

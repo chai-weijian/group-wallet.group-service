@@ -19,6 +19,7 @@ import com.chaiweijian.groupwallet.groupservice.util.ResourceNameUtil;
 import io.confluent.kafka.streams.serdes.protobuf.KafkaProtobufSerde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.utils.Bytes;
+import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.kstream.KStream;
 import org.apache.kafka.streams.kstream.Materialized;
 import org.apache.kafka.streams.kstream.Repartitioned;
@@ -44,8 +45,8 @@ public class GroupAggregateProcessor {
 
     @Bean
     public Function<KStream<String, Group>, Function<KStream<String, Group>, Function<KStream<String, Group>, Function<KStream<String, Group>,
-            Function<KStream<String, GroupInvitation>, Function<KStream<String, String>, KStream<String, Group>>>>>>> aggregateGroup() {
-        return groupCreated -> groupUpdated -> groupDeleted -> groupUndeleted -> groupInvitationAccepted -> memberRemoved -> {
+            Function<KStream<String, GroupInvitation>, Function<KStream<String, String>, Function<KStream<String, String>, KStream<String, Group>>>>>>>> aggregateGroup() {
+        return groupCreated -> groupUpdated -> groupDeleted -> groupUndeleted -> groupInvitationAccepted -> memberRemoved -> groupRemoved -> {
             var groupCreatedEvent = groupCreated.groupByKey();
             var groupUpdatedEvent = groupUpdated.groupByKey();
             var groupDeletedEvent = groupDeleted.groupByKey();
@@ -55,6 +56,10 @@ public class GroupAggregateProcessor {
                     .repartition(Repartitioned.with(Serdes.String(), groupInvitationSerde))
                     .groupByKey();
             var memberRemovedEvent = memberRemoved.groupByKey();
+            var groupRemovedEvent = groupRemoved
+                    .map(((key, value) -> KeyValue.pair(value, key)))
+                    .repartition(Repartitioned.with(Serdes.String(), Serdes.String()))
+                    .groupByKey();
 
             return groupCreatedEvent
                     .cogroup(EventHandler::handleGroupCreatedEvent)
@@ -63,6 +68,7 @@ public class GroupAggregateProcessor {
                     .cogroup(groupUndeletedEvent, EventHandler::handleGroupUndeletedEvent)
                     .cogroup(groupInvitationAcceptedEvent, EventHandler::handleGroupInvitationAcceptedEvent)
                     .cogroup(memberRemovedEvent, EventHandler::handleMemberRemovedEvent)
+                    .cogroup(groupRemovedEvent, EventHandler::handleMemberRemovedEvent)
                     .aggregate(() -> null,
                             Materialized.<String, Group, KeyValueStore<Bytes, byte[]>>as("groupwallet.groupservice.GroupAggregate-store")
                                     .withKeySerde(Serdes.String())
