@@ -27,6 +27,12 @@ spring.cloud.stream.bindings:
     destination: groupwallet.groupservice.GroupAggregate-stream
   undeleteGroup-out-0:
     destination: groupwallet.groupservice.UndeleteGroup-responses
+  removeMember-in-0:
+    destination: groupwallet.groupservice.RemoveMember-requests
+  removeMember-in-1:
+    destination: groupwallet.groupservice.GroupAggregate-stream
+  removeMember-out-0:
+    destination: groupwallet.groupservice.RemoveMember-responses
   aggregateGroup-in-0:
     destination: groupwallet.groupservice.GroupCreated-events
   aggregateGroup-in-1:
@@ -37,6 +43,8 @@ spring.cloud.stream.bindings:
     destination: groupwallet.groupservice.GroupUndeleted-events
   aggregateGroup-in-4:
     destination: groupwallet.userservice.GroupInvitationAccepted-events
+  aggregateGroup-in-5:
+    destination: groupwallet.groupservice.MemberRemoved-events
   aggregateGroup-out-0:
     destination: groupwallet.groupservice.GroupAggregate-stream
 
@@ -49,6 +57,8 @@ spring.cloud.stream.kafka.streams.binder.functions:
     application-id: groupwallet.groupservice.deleteGroup-app
   undeleteGroup:
     application-id: groupwallet.groupservice.undeleteGroup-app
+  removeMember:
+    application-id: groupwallet.groupservice.removeMember-app
   aggregateGroup:
     application-id: groupwallet.groupservice.aggregateGroup-app
 
@@ -60,7 +70,7 @@ spring.cloud.stream.kafka.streams.binder:
 spring:
   cloud:
     function:
-      definition: createGroup;updateGroup;aggregateGroup;deleteGroup;undeleteGroup
+      definition: createGroup;updateGroup;aggregateGroup;deleteGroup;removeMember;undeleteGroup
   kafka:
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer

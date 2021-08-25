@@ -17,6 +17,7 @@ package com.chaiweijian.groupwallet.groupservice.grpc.servers;
 import com.chaiweijian.groupwallet.groupservice.v1.CreateGroupRequest;
 import com.chaiweijian.groupwallet.groupservice.v1.GetGroupRequest;
 import com.chaiweijian.groupwallet.groupservice.v1.Group;
+import com.chaiweijian.groupwallet.groupservice.v1.RemoveMemberRequest;
 import com.chaiweijian.groupwallet.groupservice.v1.UpdateGroupRequest;
 import com.chaiweijian.groupwallet.groupservice.v1.DeleteGroupRequest;
 import com.chaiweijian.groupwallet.groupservice.v1.UndeleteGroupRequest;
@@ -48,17 +49,20 @@ public class GroupAggregateServer extends GroupAggregateServiceGrpc.GroupAggrega
     private final ReplyingKafkaTemplate<String, DeleteGroupRequest, Status> deleteGroupTemplate;
     private final ReplyingKafkaTemplate<String, UpdateGroupRequest, Status> updateGroupTemplate;
     private final ReplyingKafkaTemplate<String, CreateGroupRequest, Status> createGroupTemplate;
+    private final ReplyingKafkaTemplate<String, RemoveMemberRequest, Status> removeMemberTemplate;
     private final InteractiveQueryService interactiveQueryService;
 
     public GroupAggregateServer(ReplyingKafkaTemplate<String, UndeleteGroupRequest, Status> undeleteGroupTemplate,
                                 ReplyingKafkaTemplate<String, DeleteGroupRequest, Status> deleteGroupTemplate,
                                 ReplyingKafkaTemplate<String, UpdateGroupRequest, Status> updateGroupTemplate,
                                 ReplyingKafkaTemplate<String, CreateGroupRequest, Status> createGroupTemplate,
+                                ReplyingKafkaTemplate<String, RemoveMemberRequest, Status> removeMemberTemplate,
                                 InteractiveQueryService interactiveQueryService) {
         this.undeleteGroupTemplate = undeleteGroupTemplate;
         this.deleteGroupTemplate = deleteGroupTemplate;
         this.updateGroupTemplate = updateGroupTemplate;
         this.createGroupTemplate = createGroupTemplate;
+        this.removeMemberTemplate = removeMemberTemplate;
         this.interactiveQueryService = interactiveQueryService;
     }
 
@@ -145,6 +149,23 @@ public class GroupAggregateServer extends GroupAggregateServiceGrpc.GroupAggrega
             handleResponse(consumerRecord, responseObserver);
         } catch (Exception exception) {
             log.error("GroupAggregateServer - undeleteGroup Error", exception);
+            responseObserver.onError(new StatusException(io.grpc.Status.INTERNAL.withCause(exception)));
+        }
+    }
+
+    @Override
+    public void removeMember(RemoveMemberRequest request, StreamObserver<Group> responseObserver) {
+        ProducerRecord<String, RemoveMemberRequest> record = new ProducerRecord<>(
+                "groupwallet.groupservice.RemoveMember-requests",
+                request.getGroup(),
+                request);
+
+        RequestReplyFuture<String, RemoveMemberRequest, Status> replyFuture = removeMemberTemplate.sendAndReceive(record);
+        try {
+            ConsumerRecord<String, Status> consumerRecord = replyFuture.get(10, TimeUnit.SECONDS);
+            handleResponse(consumerRecord, responseObserver);
+        } catch (Exception exception) {
+            log.error("GroupAggregateServer - removeMember Error", exception);
             responseObserver.onError(new StatusException(io.grpc.Status.INTERNAL.withCause(exception)));
         }
     }

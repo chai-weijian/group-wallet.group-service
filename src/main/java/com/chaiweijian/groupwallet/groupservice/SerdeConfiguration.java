@@ -25,6 +25,7 @@ import com.chaiweijian.groupwallet.groupservice.v1.UpdateGroupRequest;
 import com.chaiweijian.groupwallet.groupservice.v1.DeleteGroupRequest;
 import com.chaiweijian.groupwallet.groupservice.v1.UndeleteGroupRequest;
 import com.chaiweijian.groupwallet.userservice.v1.GroupInvitation;
+import com.chaiweijian.groupwallet.groupservice.v1.RemoveMemberRequest;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -59,6 +60,13 @@ public class SerdeConfiguration {
     public KafkaProtobufSerde<UndeleteGroupRequest> undeleteGroupRequestKafkaProtobufSerde() {
         final KafkaProtobufSerde<UndeleteGroupRequest> protobufSerde = new KafkaProtobufSerde<>();
         protobufSerde.configure(getSerdeConfig(UndeleteGroupRequest.class.getCanonicalName()), false);
+        return protobufSerde;
+    }
+
+    @Bean
+    public KafkaProtobufSerde<RemoveMemberRequest> removeMemberRequestKafkaProtobufSerde() {
+        final KafkaProtobufSerde<RemoveMemberRequest> protobufSerde = new KafkaProtobufSerde<>();
+        protobufSerde.configure(getSerdeConfig(RemoveMemberRequest.class.getCanonicalName()), false);
         return protobufSerde;
     }
 

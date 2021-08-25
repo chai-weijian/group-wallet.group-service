@@ -30,6 +30,7 @@ import com.chaiweijian.groupwallet.userservice.v1.GroupInvitation;
 import com.chaiweijian.groupwallet.groupservice.v1.Group;
 
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Component
 public class GroupAggregateProcessor {
@@ -42,8 +43,9 @@ public class GroupAggregateProcessor {
     }
 
     @Bean
-    public Function<KStream<String, Group>, Function<KStream<String, Group>, Function<KStream<String, Group>, Function<KStream<String, Group>, Function<KStream<String, GroupInvitation>, KStream<String, Group>>>>>> aggregateGroup() {
-        return groupCreated -> groupUpdated -> groupDeleted -> groupUndeleted -> groupInvitationAccepted -> {
+    public Function<KStream<String, Group>, Function<KStream<String, Group>, Function<KStream<String, Group>, Function<KStream<String, Group>,
+            Function<KStream<String, GroupInvitation>, Function<KStream<String, String>, KStream<String, Group>>>>>>> aggregateGroup() {
+        return groupCreated -> groupUpdated -> groupDeleted -> groupUndeleted -> groupInvitationAccepted -> memberRemoved -> {
             var groupCreatedEvent = groupCreated.groupByKey();
             var groupUpdatedEvent = groupUpdated.groupByKey();
             var groupDeletedEvent = groupDeleted.groupByKey();
@@ -52,6 +54,7 @@ public class GroupAggregateProcessor {
                     .selectKey(((key, value) -> value.getGroup()))
                     .repartition(Repartitioned.with(Serdes.String(), groupInvitationSerde))
                     .groupByKey();
+            var memberRemovedEvent = memberRemoved.groupByKey();
 
             return groupCreatedEvent
                     .cogroup(EventHandler::handleGroupCreatedEvent)
@@ -59,6 +62,7 @@ public class GroupAggregateProcessor {
                     .cogroup(groupDeletedEvent, EventHandler::handleGroupDeletedEvent)
                     .cogroup(groupUndeletedEvent, EventHandler::handleGroupUndeletedEvent)
                     .cogroup(groupInvitationAcceptedEvent, EventHandler::handleGroupInvitationAcceptedEvent)
+                    .cogroup(memberRemovedEvent, EventHandler::handleMemberRemovedEvent)
                     .aggregate(() -> null,
                             Materialized.<String, Group, KeyValueStore<Bytes, byte[]>>as("groupwallet.groupservice.GroupAggregate-store")
                                     .withKeySerde(Serdes.String())
@@ -106,6 +110,16 @@ public class GroupAggregateProcessor {
                     .setAggregateVersion(aggregateVersion)
                     .setEtag(GroupAggregateUtil.calculateEtag(aggregate.getName(), aggregateVersion))
                     .addMembers(ResourceNameUtil.getGroupInvitationParentName(groupInvitation.getName()))
+                    .build();
+        }
+
+        public static Group handleMemberRemovedEvent(String key, String member, Group aggregate) {
+            var aggregateVersion = aggregate.getAggregateVersion() + 1;
+            return aggregate.toBuilder()
+                    .setAggregateVersion(aggregateVersion)
+                    .setEtag(GroupAggregateUtil.calculateEtag(aggregate.getName(), aggregateVersion))
+                    .clearMembers()
+                    .addAllMembers(aggregate.getMembersList().stream().filter(m -> !member.equals(m)).collect(Collectors.toList()))
                     .build();
         }
     }
