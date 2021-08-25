@@ -15,14 +15,17 @@
 package com.chaiweijian.groupwallet.groupservice.aggregate;
 
 import com.chaiweijian.groupwallet.groupservice.util.GroupAggregateUtil;
+import com.chaiweijian.groupwallet.groupservice.util.ResourceNameUtil;
 import io.confluent.kafka.streams.serdes.protobuf.KafkaProtobufSerde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.kafka.streams.kstream.KStream;
 import org.apache.kafka.streams.kstream.Materialized;
+import org.apache.kafka.streams.kstream.Repartitioned;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.springframework.context.annotation.Bean;
 import org.springframework.stereotype.Component;
+import com.chaiweijian.groupwallet.userservice.v1.GroupInvitation;
 
 import com.chaiweijian.groupwallet.groupservice.v1.Group;
 
@@ -31,24 +34,31 @@ import java.util.function.Function;
 @Component
 public class GroupAggregateProcessor {
     private final KafkaProtobufSerde<Group> groupSerde;
+    private final KafkaProtobufSerde<GroupInvitation> groupInvitationSerde;
 
-    public GroupAggregateProcessor(KafkaProtobufSerde<Group> groupSerde) {
+    public GroupAggregateProcessor(KafkaProtobufSerde<Group> groupSerde, KafkaProtobufSerde<GroupInvitation> groupInvitationSerde) {
         this.groupSerde = groupSerde;
+        this.groupInvitationSerde = groupInvitationSerde;
     }
 
     @Bean
-    public Function<KStream<String, Group>, Function<KStream<String, Group>, Function<KStream<String, Group>, Function<KStream<String, Group>, KStream<String, Group>>>>> aggregateGroup() {
-        return groupCreated -> groupUpdated -> groupDeleted -> groupUndeleted -> {
+    public Function<KStream<String, Group>, Function<KStream<String, Group>, Function<KStream<String, Group>, Function<KStream<String, Group>, Function<KStream<String, GroupInvitation>, KStream<String, Group>>>>>> aggregateGroup() {
+        return groupCreated -> groupUpdated -> groupDeleted -> groupUndeleted -> groupInvitationAccepted -> {
             var groupCreatedEvent = groupCreated.groupByKey();
             var groupUpdatedEvent = groupUpdated.groupByKey();
             var groupDeletedEvent = groupDeleted.groupByKey();
             var groupUndeletedEvent = groupUndeleted.groupByKey();
+            var groupInvitationAcceptedEvent = groupInvitationAccepted
+                    .selectKey(((key, value) -> value.getGroup()))
+                    .repartition(Repartitioned.with(Serdes.String(), groupInvitationSerde))
+                    .groupByKey();
 
             return groupCreatedEvent
                     .cogroup(EventHandler::handleGroupCreatedEvent)
                     .cogroup(groupUpdatedEvent, EventHandler::handleGroupUpdatedEvent)
                     .cogroup(groupDeletedEvent, EventHandler::handleGroupDeletedEvent)
                     .cogroup(groupUndeletedEvent, EventHandler::handleGroupUndeletedEvent)
+                    .cogroup(groupInvitationAcceptedEvent, EventHandler::handleGroupInvitationAcceptedEvent)
                     .aggregate(() -> null,
                             Materialized.<String, Group, KeyValueStore<Bytes, byte[]>>as("groupwallet.groupservice.GroupAggregate-store")
                                     .withKeySerde(Serdes.String())
@@ -87,6 +97,15 @@ public class GroupAggregateProcessor {
             return group.toBuilder()
                     .setAggregateVersion(aggregateVersion)
                     .setEtag(GroupAggregateUtil.calculateEtag(group.getName(), aggregateVersion))
+                    .build();
+        }
+
+        public static Group handleGroupInvitationAcceptedEvent(String key, GroupInvitation groupInvitation, Group aggregate) {
+            var aggregateVersion = aggregate.getAggregateVersion() + 1;
+            return aggregate.toBuilder()
+                    .setAggregateVersion(aggregateVersion)
+                    .setEtag(GroupAggregateUtil.calculateEtag(aggregate.getName(), aggregateVersion))
+                    .addMembers(ResourceNameUtil.getGroupInvitationParentName(groupInvitation.getName()))
                     .build();
         }
     }
